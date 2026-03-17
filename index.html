@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abitur-Rechner BG Niedersachsen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Verhindert Pfeile in Number-Inputs für ein saubereres Design */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-800 p-6 rounded-xl border border-gray-700">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-white">Abitur-Rechner: Berufliches Gymnasium</h1>
+                <p class="text-gray-400 mt-1">Niedersachsen • Freie Fächerwahl • Exakt 36 Einbringungen zwingend</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="resetAll()" class="flex items-center gap-2 bg-red-900/50 hover:bg-red-800 text-red-200 px-4 py-2.5 rounded-lg font-bold transition shadow-lg border border-red-700/50">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Reset
+                </button>
+                <button onclick="exportCSV()" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold transition shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    CSV Export
+                </button>
+            </div>
+        </div>
+
+        <!-- Scoreboard -->
+        <div class="bg-blue-900/20 border-2 border-blue-600/50 rounded-xl p-8 text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-500"></div>
+            <h2 class="text-sm uppercase tracking-widest text-blue-300 font-bold mb-2">Voraussichtliche Abiturnote</h2>
+            <div id="finalGrade" class="text-7xl font-black text-white drop-shadow-md mb-4">---</div>
+            
+            <div class="flex justify-center gap-8 text-lg font-medium text-blue-100">
+                <div>Block I: <span id="block1Score" class="font-bold text-white">0</span> / 600</div>
+                <div>Block II: <span id="block2Score" class="font-bold text-white">0</span> / 300</div>
+                <div>Gesamt: <span id="totalScore" class="font-bold text-white">0</span> / 900</div>
+            </div>
+            
+            <div id="statusBadge" class="mt-6 inline-flex flex-col items-center gap-2">
+                <!-- Wird per JS befüllt -->
+            </div>
+        </div>
+
+        <!-- Validations Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <h3 class="text-xl font-bold mb-4 text-white border-b border-gray-700 pb-2 flex justify-between items-center">
+                    <span>Block I (Qualifikationsphase)</span>
+                    <span id="hookCountBadge" class="text-sm px-2 py-1 rounded"></span>
+                </h3>
+                
+                <div id="limitWarning" class="hidden mb-4 text-sm text-blue-300 bg-blue-900/20 p-3 rounded-lg flex gap-2 items-start border border-blue-800/50">
+                    <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p>Du hast das Limit von 36 Halbjahren erreicht. Um ein anderes Fach einzubringen, musst du zuerst einen bestehenden Haken entfernen.</p>
+                </div>
+
+                <div class="text-sm text-gray-400 mb-4 flex justify-between bg-gray-900 p-3 rounded">
+                    <span>Noten eingetragen: <strong id="gradedCount" class="text-white">0</strong> / 36</span>
+                    <span>P1/P2: <strong id="doubleCount" class="text-white">0</strong> | P3-sonst.: <strong id="singleCount" class="text-white">0</strong></span>
+                </div>
+                <ul id="block1Checks" class="space-y-3 text-sm"></ul>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                <h3 class="text-xl font-bold mb-4 text-white border-b border-gray-700 pb-2">Block II (Abiturprüfung)</h3>
+                <ul id="block2Checks" class="space-y-3 text-sm"></ul>
+            </div>
+        </div>
+
+        <!-- Noten Tabelle -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[900px]">
+                <thead>
+                    <tr class="bg-gray-900 border-b border-gray-700 text-sm uppercase text-gray-400 tracking-wider">
+                        <th class="p-4 font-semibold">Fach (klick zum Ändern)</th>
+                        <th class="p-4 font-semibold text-center w-24">12.1</th>
+                        <th class="p-4 font-semibold text-center w-24">12.2</th>
+                        <th class="p-4 font-semibold text-center w-24">13.1</th>
+                        <th class="p-4 font-semibold text-center w-24">13.2</th>
+                        <th class="p-4 font-semibold text-center w-32 border-l border-gray-700 bg-gray-900/50">Abi-Prüfung</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-gray-700">
+                    <!-- Wird per JS generiert -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    // Ursprünglicher Datenstamm
+    const initialSubjects = [
+        { id: 'p1', name: '1. Prüfungsfach (P1)', type: 'P1', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: true },
+        { id: 'p2', name: '2. Prüfungsfach (P2)', type: 'P2', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: true },
+        { id: 'p3', name: '3. Prüfungsfach (P3)', type: 'P3', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: true },
+        { id: 'p4', name: '4. Prüfungsfach (P4)', type: 'P4', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: false },
+        { id: 'p5', name: '5. Prüfungsfach (P5, mündl.)', type: 'P5', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: false },
+        { id: 'd', name: 'Deutsch', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: false },
+        { id: 'nw', name: 'Naturwissenschaft (z.B. Physik)', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: false },
+        { id: 'prax', name: 'Praxis-Fach / Zweite Fremdsprache', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: true, h4: true }, isEa: false },
+        { id: 'powi', name: 'Geschichte / Politik', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: true, h2: true, h3: false, h4: false }, isEa: false },
+        { id: 'wun', name: 'Religion / Werte und Normen', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: false, h2: false, h3: true, h4: true }, isEa: false },
+        { id: 'sport', name: 'Sport', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: false, h2: false, h3: false, h4: false }, isEa: false },
+        { id: 'opt1', name: 'Weiteres Fach 1', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: false, h2: false, h3: false, h4: false }, isEa: false },
+        { id: 'opt2', name: 'Weiteres Fach 2', type: 'Other', grades: { h1: '', h2: '', h3: '', h4: '', abi: '' }, active: { h1: false, h2: false, h3: false, h4: false }, isEa: false }
+    ];
+
+    // Aktueller State (Kopie des Initialzustands um Referenzprobleme zu vermeiden)
+    let subjects = JSON.parse(JSON.stringify(initialSubjects));
+
+    // Update-Funktionen
+    window.updateName = function(id, value) {
+        subjects.find(s => s.id === id).name = value;
+        render(); // Name muss nicht zwingend die Validierung triggern, aber der Einfachheit halber neu rendern
+    };
+
+    window.updateGrade = function(id, field, value) {
+        let num = parseInt(value);
+        let finalValue = '';
+        if (!isNaN(num)) {
+            finalValue = Math.max(0, Math.min(15, num)); // Beschränkung 0-15
+        }
+        subjects.find(s => s.id === id).grades[field] = finalValue;
+        render();
+    };
+
+    window.updateActive = function(id, field, isChecked) {
+        subjects.find(s => s.id === id).active[field] = isChecked;
+        render();
+    };
+
+    window.resetAll = function() {
+        if(confirm("Bist du sicher, dass du alle Eingaben löschen möchtest?")) {
+            subjects = JSON.parse(JSON.stringify(initialSubjects));
+            render();
+        }
+    };
+
+    window.exportCSV = function() {
+        let csv = "Fach;Art;12.1 Note;12.1 Einbringen;12.2 Note;12.2 Einbringen;13.1 Note;13.1 Einbringen;13.2 Note;13.2 Einbringen;Abiturpruefung\n";
+        subjects.forEach(sub => {
+            csv += `"${sub.name}";"${sub.type}";${sub.grades.h1};${sub.active.h1};${sub.grades.h2};${sub.active.h2};${sub.grades.h3};${sub.active.h3};${sub.grades.h4};${sub.active.h4};${sub.grades.abi || ''}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'abitur_noten_bg_niedersachsen.csv';
+        link.click();
+    };
+
+    // Haupt Render- und Berechnungsfunktion
+    function render() {
+        // 1. Zähle Checkboxen
+        let checkedBoxesCount = 0;
+        subjects.forEach(sub => {
+            ['h1', 'h2', 'h3', 'h4'].forEach(h => {
+                if(sub.active[h]) checkedBoxesCount++;
+            });
+        });
+
+        // 2. Berechnungen durchführen
+        let countDouble = 0, countSingle = 0, sumDouble = 0, sumSingle = 0;
+        let ukEa = 0, ukTotal = 0, sportCount = 0;
+        let zeroPointsBlock1 = false, zeroPointsBlock2 = false;
+        let block2PointsRaw = 0, countAbi = 0, abiOver5 = 0;
+        let gradedCoursesCount = 0;
+
+        subjects.forEach(sub => {
+            // Block I
+            ['h1', 'h2', 'h3', 'h4'].forEach(h => {
+                if (sub.active[h] && sub.grades[h] !== '') {
+                    gradedCoursesCount++;
+                    const g = parseInt(sub.grades[h]);
+                    if (!isNaN(g)) {
+                        if (g === 0) zeroPointsBlock1 = true;
+                        if (g < 5) {
+                            ukTotal++;
+                            if (sub.type === 'P1' || sub.type === 'P2' || sub.type === 'P3') ukEa++;
+                        }
+                        if (sub.type === 'P1' || sub.type === 'P2') {
+                            sumDouble += g; countDouble++;
+                        } else {
+                            sumSingle += g; countSingle++;
+                        }
+                        if (sub.id === 'sport') sportCount++;
+                    }
+                }
+            });
+
+            // Block II
+            if (['P1', 'P2', 'P3', 'P4', 'P5'].includes(sub.type)) {
+                const g = parseInt(sub.grades.abi);
+                if (!isNaN(g)) {
+                    if (g === 0) zeroPointsBlock2 = true;
+                    block2PointsRaw += g;
+                    countAbi++;
+                    if (g >= 5) {
+                        abiOver5++;
+                    }
+                }
+            }
+        });
+
+        const totalCourses = countDouble + countSingle;
+        const S = (countDouble * 2) + countSingle;
+        const P = (sumDouble * 2) + sumSingle;
+        
+        // Formel NDS BG: E = 40 * P / S
+        const block1Final = S > 0 ? Math.round((40 * P) / S) : 0;
+        const block2Final = block2PointsRaw * 4;
+        const totalPoints = block1Final + block2Final;
+        const maxUkTotal = 7; 
+
+        const checks = [
+            { text: "Kein eingebrachter Kurs 0 Punkte", passed: !zeroPointsBlock1 && totalCourses > 0 },
+            { text: "Exakt 8 Halbjahre in P1/P2 (doppelte Wertung)", passed: countDouble === 8 },
+            { text: "Exakt 28 weitere Halbjahre (einfache Wertung)", passed: countSingle === 28 },
+            { text: "Max. 3 Unterkurse in P1, P2 und P3", passed: ukEa <= 3 },
+            { text: `Max. ${maxUkTotal} Unterkurse insgesamt in Block I`, passed: ukTotal <= maxUkTotal },
+            { text: "Max. 3 Sportkurse eingebracht", passed: sportCount <= 3 },
+            { text: "Block I mind. 200 Punkte erreicht", passed: block1Final >= 200 },
+            { text: "Alle 5 Abiprüfungen absolviert", passed: countAbi === 5 },
+            { text: "Keine Abiprüfung mit 0 Punkten", passed: !zeroPointsBlock2 && countAbi === 5 },
+            { text: "Mind. 3 Abiprüfungen mit mind. 5 Punkten (vor Verf.)", passed: abiOver5 >= 3 },
+            { text: "Block II mind. 100 Punkte erreicht", passed: block2Final >= 100 }
+        ];
+
+        const allChecksPassed = checks.every(c => c.passed);
+        
+        // Note berechnen
+        let finalGradeStr = "---";
+        if (totalPoints >= 300 && allChecksPassed) {
+            let g = Math.floor((17/3 - totalPoints/180) * 10) / 10;
+            finalGradeStr = g < 1.0 ? "1.0" : g.toFixed(1);
+        }
+
+        // 3. UI Aktualisieren
+        document.getElementById('finalGrade').innerText = finalGradeStr;
+        document.getElementById('block1Score').innerText = block1Final;
+        document.getElementById('block2Score').innerText = block2Final;
+        document.getElementById('totalScore').innerText = totalPoints;
+        
+        document.getElementById('gradedCount').innerText = gradedCoursesCount;
+        document.getElementById('doubleCount').innerText = countDouble;
+        document.getElementById('singleCount').innerText = countSingle;
+
+        const hookBadge = document.getElementById('hookCountBadge');
+        hookBadge.innerText = `Haken gesetzt: ${checkedBoxesCount}/36`;
+        if(checkedBoxesCount === 36) {
+            hookBadge.className = "text-sm px-2 py-1 rounded bg-green-900/50 text-green-400";
+            document.getElementById('limitWarning').classList.remove('hidden');
+        } else {
+            hookBadge.className = "text-sm px-2 py-1 rounded bg-yellow-900/50 text-yellow-400";
+            document.getElementById('limitWarning').classList.add('hidden');
+        }
+
+        const successIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+        const errorIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+
+        document.getElementById('statusBadge').innerHTML = allChecksPassed 
+            ? `<span class="px-4 py-2 rounded-full bg-gray-900/50 text-green-400 font-bold flex items-center gap-2">${successIcon} Alle Zulassungsbedingungen erfüllt</span>`
+            : `<span class="px-4 py-2 rounded-full bg-gray-900/50 text-red-400 font-bold flex items-center gap-2">${errorIcon} Bedingungen nicht vollständig erfüllt</span>`;
+
+        // Validation Listen rendern
+        const renderCheckList = (checkList) => checkList.map(c => `
+            <li class="flex items-start gap-3">
+                <span class="${c.passed ? 'text-green-500' : 'text-red-500'} shrink-0">${c.passed ? successIcon : errorIcon}</span>
+                <span class="${c.passed ? 'text-gray-300' : 'text-red-400 font-semibold'}">${c.text}</span>
+            </li>
+        `).join('');
+
+        document.getElementById('block1Checks').innerHTML = renderCheckList(checks.slice(0, 7));
+        document.getElementById('block2Checks').innerHTML = renderCheckList(checks.slice(7));
+
+        // Tabelle rendern
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = subjects.map(sub => {
+            const isMandatory = ['P1', 'P2', 'P3', 'P4', 'P5'].includes(sub.type);
+            const isDouble = ['P1', 'P2'].includes(sub.type);
+            const typeBadge = sub.type !== 'Other' ? `<span class="bg-blue-900 text-blue-200 px-2 py-0.5 rounded mr-2">${sub.type}</span>` : '';
+            const weightText = isDouble ? 'Doppelte Wertung' : 'Einfache Wertung';
+
+            let halbjahrHTML = ['h1', 'h2', 'h3', 'h4'].map(h => {
+                const isCheckboxDisabled = isMandatory || (!sub.active[h] && checkedBoxesCount >= 36);
+                const inputDisabled = !sub.active[h] ? 'disabled' : '';
+                
+                let inputClass = "w-14 h-10 text-center text-lg font-bold rounded focus:ring-2 outline-none transition-all ";
+                if (!sub.active[h]) {
+                    inputClass += "opacity-20 bg-gray-900 border-gray-800 text-gray-600 cursor-not-allowed";
+                } else if (sub.grades[h] !== '' && parseInt(sub.grades[h]) < 5) {
+                    inputClass += "bg-gray-900 border border-red-500 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.2)]";
+                } else {
+                    inputClass += "bg-gray-900 border border-gray-600 text-white focus:border-blue-500";
+                }
+
+                return `
+                    <td class="p-4 text-center">
+                        <div class="flex flex-col items-center gap-2">
+                            <input type="number" min="0" max="15" placeholder="-" value="${sub.grades[h]}" 
+                                onchange="updateGrade('${sub.id}', '${h}', this.value)" ${inputDisabled}
+                                class="${inputClass}" />
+                            <input type="checkbox" ${sub.active[h] ? 'checked' : ''} ${isCheckboxDisabled ? 'disabled' : ''}
+                                onchange="updateActive('${sub.id}', '${h}', this.checked)"
+                                class="w-4 h-4 accent-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" />
+                        </div>
+                    </td>
+                `;
+            }).join('');
+
+            let abiHTML = `<td class="p-4 text-center border-l border-gray-700 bg-gray-900/30"><span class="text-gray-600 text-sm italic">-</span></td>`;
+            if (isMandatory) {
+                let abiClass = "w-16 h-12 text-center text-xl font-bold rounded focus:ring-2 outline-none transition-all ";
+                if(sub.grades.abi !== '' && parseInt(sub.grades.abi) < 5) {
+                    abiClass += "bg-gray-800 border-2 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]";
+                } else {
+                    abiClass += "bg-gray-800 border-2 border-blue-500 text-white";
+                }
+                abiHTML = `
+                    <td class="p-4 text-center border-l border-gray-700 bg-gray-900/30">
+                        <div class="flex flex-col items-center">
+                            <input type="number" min="0" max="15" placeholder="-" value="${sub.grades.abi}"
+                                onchange="updateGrade('${sub.id}', 'abi', this.value)"
+                                class="${abiClass}" />
+                            <span class="text-xs text-gray-500 mt-2 font-medium">Wertung x4</span>
+                        </div>
+                    </td>
+                `;
+            }
+
+            return `
+                <tr class="hover:bg-gray-700/30 transition-colors">
+                    <td class="p-4">
+                        <input type="text" value="${sub.name}" onchange="updateName('${sub.id}', this.value)"
+                            class="bg-transparent font-bold text-white w-full outline-none border-b border-transparent focus:border-blue-500 transition-colors"
+                            placeholder="Fachname eingeben..." />
+                        <div class="text-xs text-gray-400 mt-1">${typeBadge} ${weightText}</div>
+                    </td>
+                    ${halbjahrHTML}
+                    ${abiHTML}
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Initiale Render-Ausführung beim Start
+    render();
+</script>
+</body>
+</html>
